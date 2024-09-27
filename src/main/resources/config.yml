@@ -1,0 +1,18 @@
+############################################
+#__ _         __  __   ___ _           _
+#/ _\ |_ __ _ / _|/ _| / __\ |__   __ _| |_
+#\ \| __/ _` | |_| |_ / /  | '_ \ / _` | __|
+#_\ \ || (_| |  _|  _/ /___| | | | (_| | |_
+#\__/\__\__,_|_| |_| \____/|_| |_|\__,_|\__|
+############################################
+
+# Configuration for Staff Chat Plugin
+
+# This prefix will be typed before the private message
+chat-prefix: '@'
+
+# The prefix that appears before messages in staff chat
+plugin-prefix: '&a[Staff Chat]'
+
+# Version of the plugin
+version: 2.3.0

@@ -1,0 +1,29 @@
+name: StaffChat
+version: 2.3
+main: com.whiteiverson.minecraft.Staffchat_plugin.Main
+api-version: 1.18
+author: WhiteIverson97
+description: A plugin that provides a private chat for the administration team.
+
+permissions:
+  staffchat.*:
+    default: false
+    children:
+      staffchat.receive: true
+      staffchat.send: true
+      staffchat.command: true
+  staffchat.receive:
+    default: false
+    description: "Allows the user to receive messages from the staff chat."
+  staffchat.send:
+    default: true
+    description: "Allows the user to send messages in the staff chat."
+  staffchat.command:
+    default: false
+    description: "Allows the user to execute the staff chat command."
+
+commands:
+  staffchat:
+    description: "Main command to manage the StaffChat plugin."
+    aliases: [sc]  # Changed to array format for better readability
+    permission: staffchat.command
