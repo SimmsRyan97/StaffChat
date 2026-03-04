@@ -1,0 +1,29 @@
+name: StaffChat
+version: 1.1.0
+main: com.whiteiverson.staffchat.StaffChatPlugin
+api-version: "1.20"
+author: WhiteIverson97
+description: Fast, configurable staff-only communication channel with prefix-based chat routing.
+
+permissions:
+  staffchat.*:
+    default: op
+    children:
+      staffchat.receive: true
+      staffchat.send: true
+      staffchat.command: true
+  staffchat.receive:
+    default: false
+    description: Allows the user to receive StaffChat messages.
+  staffchat.send:
+    default: false
+    description: Allows the user to send StaffChat messages.
+  staffchat.command:
+    default: op
+    description: Allows the user to manage StaffChat commands.
+
+commands:
+  staffchat:
+    description: Main command to manage StaffChat.
+    aliases: [sc]
+    permission: staffchat.command
