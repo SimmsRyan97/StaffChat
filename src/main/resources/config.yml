@@ -21,3 +21,24 @@ messages:
   reloaded: "&aStaffChat configuration reloaded."
   help-header: "&6StaffChat"
   help-reload: "&7/sc reload &8- &fReload configuration"
+
+discord:
+  # Enable forwarding of prefixed in-game staff messages to Discord.
+  enabled: false
+
+  # AUTO, DISCORDSRV, ESSENTIALS
+  provider: "AUTO"
+
+  # Recommended: set channel-id for DiscordSRV relay.
+  # You can also use channel-name as fallback.
+  channel-id: ""
+  channel-name: "staff-chat"
+
+  # Placeholders: %sender%, %message%, %channel_id%, %channel_name%
+  message-format: "[StaffChat] %sender%: %message%"
+
+  # Used only when provider is ESSENTIALS.
+  # This is dispatched as console command with placeholder replacement.
+  # Example (replace with command supported by your Essentials Discord bridge):
+  # essentials-relay-command: "essentialsdiscord send %channel_name% %message%"
+  essentials-relay-command: ""

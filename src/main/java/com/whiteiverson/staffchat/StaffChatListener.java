@@ -12,9 +12,11 @@ public final class StaffChatListener implements Listener {
     private static final String RECEIVE_PERMISSION = "staffchat.receive";
 
     private final StaffChatSettings settings;
+    private final DiscordRelayService discordRelayService;
 
-    public StaffChatListener(StaffChatSettings settings) {
+    public StaffChatListener(StaffChatSettings settings, DiscordRelayService discordRelayService) {
         this.settings = settings;
+        this.discordRelayService = discordRelayService;
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
@@ -47,5 +49,7 @@ public final class StaffChatListener implements Listener {
                 onlinePlayer.sendMessage(formattedMessage);
             }
         }
+
+        discordRelayService.relayStaffMessage(sender.getName(), content);
     }
 }

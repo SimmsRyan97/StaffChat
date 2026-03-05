@@ -23,6 +23,13 @@ public final class StaffChatSettings {
     private String helpHeader;
     private String helpReloadLine;
 
+    private boolean discordEnabled;
+    private String discordProvider;
+    private String discordChannelId;
+    private String discordChannelName;
+    private String discordMessageFormat;
+    private String essentialsRelayCommand;
+
     public StaffChatSettings(JavaPlugin plugin) {
         this.plugin = plugin;
     }
@@ -41,6 +48,13 @@ public final class StaffChatSettings {
         reloadedMessage = colorize(config.getString("messages.reloaded", "&aStaffChat configuration reloaded."));
         helpHeader = colorize(config.getString("messages.help-header", "&6StaffChat"));
         helpReloadLine = colorize(config.getString("messages.help-reload", "&7/sc reload &8- &fReload configuration"));
+
+        discordEnabled = config.getBoolean("discord.enabled", false);
+        discordProvider = config.getString("discord.provider", "AUTO");
+        discordChannelId = config.getString("discord.channel-id", "");
+        discordChannelName = config.getString("discord.channel-name", "");
+        discordMessageFormat = config.getString("discord.message-format", "[StaffChat] %sender%: %message%");
+        essentialsRelayCommand = config.getString("discord.essentials-relay-command", "");
     }
 
     public String getChatPrefix() {
@@ -71,6 +85,35 @@ public final class StaffChatSettings {
 
     public String getHelpReloadLine() {
         return helpReloadLine;
+    }
+
+    public boolean isDiscordEnabled() {
+        return discordEnabled;
+    }
+
+    public String getDiscordProvider() {
+        return discordProvider == null ? "AUTO" : discordProvider;
+    }
+
+    public String getDiscordChannelId() {
+        return discordChannelId == null ? "" : discordChannelId;
+    }
+
+    public String getDiscordChannelName() {
+        return discordChannelName == null ? "" : discordChannelName;
+    }
+
+    public String getEssentialsRelayCommand() {
+        return essentialsRelayCommand == null ? "" : essentialsRelayCommand;
+    }
+
+    public String formatDiscordMessage(String senderName, String content) {
+        String template = discordMessageFormat == null ? "[StaffChat] %sender%: %message%" : discordMessageFormat;
+        return template
+            .replace("%sender%", senderName)
+            .replace("%message%", content)
+            .replace("%channel_id%", getDiscordChannelId())
+            .replace("%channel_name%", getDiscordChannelName());
     }
 
     private static String colorize(String text) {

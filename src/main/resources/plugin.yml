@@ -4,6 +4,7 @@ main: com.whiteiverson.staffchat.StaffChatPlugin
 api-version: "1.20"
 author: WhiteIverson97
 description: Fast, configurable staff-only communication channel with prefix-based chat routing.
+softdepend: [DiscordSRV, Essentials, EssentialsDiscord, EssentialsXDiscord]
 
 permissions:
   staffchat.*:
