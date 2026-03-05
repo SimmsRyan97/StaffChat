@@ -1,0 +1,23 @@
+# StaffChat configuration
+
+chat:
+  # Prefix players type at the start of a message to route it to staff chat.
+  prefix: "@"
+
+  # If true, players without `staffchat.send` can still send prefix-based messages,
+  # but only users with `staffchat.receive` will see them.
+  allow-public-sending: true
+
+style:
+  # Supports legacy '&' colors (example: &a, &6, &7)
+  # and hex colors in formats: #55FFAA, &#55FFAA, <#55FFAA>.
+  plugin-prefix: "&a[Staff Chat]"
+
+  # Available placeholders: %prefix%, %sender%, %message%
+  message-format: "%prefix% &7%sender% &8> &f%message%"
+
+messages:
+  no-permission: "&cYou do not have permission to do that."
+  reloaded: "&aStaffChat configuration reloaded."
+  help-header: "&6StaffChat"
+  help-reload: "&7/sc reload &8- &fReload configuration"
