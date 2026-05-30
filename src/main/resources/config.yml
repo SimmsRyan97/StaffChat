@@ -24,21 +24,23 @@ messages:
 
 discord:
   # Enable forwarding of prefixed in-game staff messages to Discord.
-  enabled: false
+  enabled: true
 
-  # AUTO, DISCORDSRV, ESSENTIALS
+  # Which provider to use: AUTO, DISCORDSRV, ESSENTIALS
+  # AUTO tries DiscordSRV first, then EssentialsXDiscord as fallback.
   provider: "AUTO"
 
-  # Recommended: set channel-id for DiscordSRV relay.
-  # You can also use channel-name as fallback.
+  # The Discord channel ID to send messages to.
+  # Right-click the channel in Discord (with Developer Mode on) and copy the ID.
   channel-id: ""
   channel-name: "staff-chat"
 
-  # Placeholders: %sender%, %message%, %channel_id%, %channel_name%
-  message-format: "[StaffChat] %sender%: %message%"
+  # Message format sent to Discord.
+  # Mirrors the normal in-game chat format DiscordSRV uses: "PlayerName: message"
+  # Placeholders: %sender%, %message%
+  message-format: "**[Staff Chat]** %sender% > %message%"
 
   # Used only when provider is ESSENTIALS.
-  # This is dispatched as console command with placeholder replacement.
-  # Example (replace with command supported by your Essentials Discord bridge):
-  # essentials-relay-command: "essentialsdiscord send %channel_name% %message%"
-  essentials-relay-command: ""
+  # EssentialsXDiscord command to send a message to a channel by ID.
+  # Syntax: essentialsdiscord message <channelId> <message>
+  essentials-relay-command: "essentialsdiscord message %channel_id% [Staff Chat] %sender% > %message%"

@@ -1,10 +1,10 @@
 package com.whiteiverson.staffchat;
 
+import github.scarsz.discordsrv.DiscordSRV;
 import org.bukkit.Bukkit;
 import org.bukkit.plugin.Plugin;
 
 import java.lang.reflect.Method;
-import java.util.List;
 import java.util.Locale;
 
 public final class DiscordRelayService {
@@ -26,129 +26,117 @@ public final class DiscordRelayService {
         }
 
         String provider = settings.getDiscordProvider().toUpperCase(Locale.ROOT);
-        boolean sent;
 
         switch (provider) {
             case "DISCORDSRV":
-                sent = sendViaDiscordSrv(senderName, content);
+                sendViaDiscordSrv(senderName, content);
                 break;
             case "ESSENTIALS":
-                sent = sendViaEssentialsCommand(senderName, content);
+                sendViaEssentials(senderName, content);
                 break;
             default:
-                sent = autoSend(senderName, content);
+                // AUTO: DiscordSRV first, Essentials fallback
+                if (isPluginEnabled("DiscordSRV")) {
+                    sendViaDiscordSrv(senderName, content);
+                } else if (isPluginEnabled("EssentialsDiscord") || isPluginEnabled("EssentialsXDiscord")) {
+                    sendViaEssentials(senderName, content);
+                } else {
+                    plugin.getLogger()
+                            .fine("Discord relay enabled but no provider (DiscordSRV / EssentialsDiscord) is loaded.");
+                }
                 break;
         }
-
-        if (!sent && provider.equals("AUTO")) {
-            plugin.getLogger().fine("Discord relay was enabled, but no provider was available for this message.");
-        }
     }
 
-    private boolean autoSend(String senderName, String content) {
-        if (isPluginEnabled("DiscordSRV")) {
-            return sendViaDiscordSrv(senderName, content);
-        }
+    // ---- DiscordSRV --------------------------------------------------------
 
-        if (isPluginEnabled("Essentials") || isPluginEnabled("EssentialsDiscord") || isPluginEnabled("EssentialsXDiscord")) {
-            return sendViaEssentialsCommand(senderName, content);
-        }
-
-        return false;
-    }
-
-    private boolean sendViaDiscordSrv(String senderName, String content) {
+    private void sendViaDiscordSrv(String senderName, String content) {
         if (!isPluginEnabled("DiscordSRV")) {
             if (!warnedDiscordSrvUnavailable) {
                 warnedDiscordSrvUnavailable = true;
-                plugin.getLogger().warning("Discord relay provider is DiscordSRV, but DiscordSRV is not enabled.");
+                plugin.getLogger().warning("StaffChat: discord.provider is DISCORDSRV but DiscordSRV is not loaded.");
             }
-            return false;
+            return;
+        }
+
+        String channelId = settings.getDiscordChannelId();
+        if (channelId.isBlank()) {
+            plugin.getLogger().warning("StaffChat: discord.channel-id is empty. Cannot send to Discord.");
+            return;
         }
 
         String message = settings.formatDiscordMessage(senderName, content);
 
+        // DiscordSRV is a provided dependency — on the compile classpath but not
+        // bundled.
+        // JDA (used by DiscordSRV internally) is accessed via reflection to avoid
+        // needing
+        // a separate JDA dependency declaration while still keeping clean DiscordSRV
+        // imports.
         try {
-            Class<?> discordSrvClass = Class.forName("github.scarsz.discordsrv.DiscordSRV");
-            Object discordSrvPlugin = discordSrvClass.getMethod("getPlugin").invoke(null);
-            if (discordSrvPlugin == null) {
-                return false;
-            }
-
-            Object jda = discordSrvPlugin.getClass().getMethod("getJda").invoke(discordSrvPlugin);
+            Object jda = DiscordSRV.getPlugin().getJda();
             if (jda == null) {
-                return false;
+                plugin.getLogger().warning("StaffChat: DiscordSRV JDA instance is null — is the bot connected?");
+                return;
             }
 
-            Object textChannel = resolveTextChannel(jda);
-            if (textChannel == null) {
-                plugin.getLogger().warning("DiscordSRV relay could not find a text channel. Check discord.channel-id or discord.channel-name.");
-                return false;
+            Object channel = jda.getClass().getMethod("getTextChannelById", String.class).invoke(jda, channelId);
+            if (channel == null) {
+                plugin.getLogger().warning("StaffChat: Could not find Discord channel ID " + channelId
+                        + ". Check the bot has access to it.");
+                return;
             }
 
-            Method sendMessageMethod = textChannel.getClass().getMethod("sendMessage", CharSequence.class);
-            Object action = sendMessageMethod.invoke(textChannel, message);
-            action.getClass().getMethod("queue").invoke(action);
-            return true;
-        } catch (ReflectiveOperationException exception) {
-            plugin.getLogger().warning("DiscordSRV relay failed: " + exception.getMessage());
-            return false;
+            // JDA 4 uses sendMessage(CharSequence); this reflection handles both versions
+            // safely.
+            Method sendMethod;
+            try {
+                sendMethod = channel.getClass().getMethod("sendMessage", CharSequence.class);
+            } catch (NoSuchMethodException ignored) {
+                sendMethod = channel.getClass().getMethod("sendMessage", String.class);
+            }
+
+            Object restAction = sendMethod.invoke(channel, message);
+            restAction.getClass().getMethod("queue").invoke(restAction);
+        } catch (Exception exception) {
+            plugin.getLogger().warning("StaffChat: DiscordSRV relay failed — " + exception.getMessage());
         }
     }
 
-    private Object resolveTextChannel(Object jda) throws ReflectiveOperationException {
-        String channelId = settings.getDiscordChannelId();
-        String channelName = settings.getDiscordChannelName();
+    // ---- EssentialsXDiscord ------------------------------------------------
 
-        if (channelId != null && !channelId.isBlank()) {
-            Method byId = jda.getClass().getMethod("getTextChannelById", String.class);
-            Object channel = byId.invoke(jda, channelId);
-            if (channel != null) {
-                return channel;
-            }
-        }
-
-        if (channelName != null && !channelName.isBlank()) {
-            Method byName = jda.getClass().getMethod("getTextChannelsByName", String.class, boolean.class);
-            Object channels = byName.invoke(jda, channelName, true);
-            if (channels instanceof List) {
-                List<?> list = (List<?>) channels;
-                if (!list.isEmpty()) {
-                    return list.get(0);
-                }
-            }
-        }
-
-        return null;
-    }
-
-    private boolean sendViaEssentialsCommand(String senderName, String content) {
-        if (!isPluginEnabled("Essentials") && !isPluginEnabled("EssentialsDiscord") && !isPluginEnabled("EssentialsXDiscord")) {
+    private void sendViaEssentials(String senderName, String content) {
+        if (!isPluginEnabled("EssentialsDiscord") && !isPluginEnabled("EssentialsXDiscord")) {
             if (!warnedEssentialsUnavailable) {
                 warnedEssentialsUnavailable = true;
-                plugin.getLogger().warning("Discord relay provider is Essentials, but no Essentials plugin was detected.");
+                plugin.getLogger()
+                        .warning("StaffChat: discord.provider is ESSENTIALS but EssentialsDiscord is not loaded.");
             }
-            return false;
+            return;
         }
 
         String commandTemplate = settings.getEssentialsRelayCommand();
         if (commandTemplate == null || commandTemplate.isBlank()) {
             if (!warnedEssentialsCommandMissing) {
                 warnedEssentialsCommandMissing = true;
-                plugin.getLogger().warning("discord.essentials-relay-command is empty. Cannot relay via Essentials.");
+                plugin.getLogger()
+                        .warning("StaffChat: discord.essentials-relay-command is empty. Cannot relay via Essentials.");
             }
-            return false;
+            return;
         }
 
+        String message = settings.formatDiscordMessage(senderName, content);
         String command = commandTemplate
-            .replace("%sender%", senderName)
-            .replace("%message%", settings.formatDiscordMessage(senderName, content))
-            .replace("%channel_id%", settings.getDiscordChannelId())
-            .replace("%channel_name%", settings.getDiscordChannelName());
+                .replace("%sender%", senderName)
+                .replace("%message%", message)
+                .replace("%channel_id%", settings.getDiscordChannelId())
+                .replace("%channel_name%", settings.getDiscordChannelName());
 
+        // dispatchCommand must run on the main thread
         Bukkit.getScheduler().runTask(plugin, () -> Bukkit.dispatchCommand(Bukkit.getConsoleSender(), command));
-        return true;
     }
+
+    // ---- Helpers -----------------------------------------------------------
 
     private boolean isPluginEnabled(String pluginName) {
         Plugin loadedPlugin = Bukkit.getPluginManager().getPlugin(pluginName);
