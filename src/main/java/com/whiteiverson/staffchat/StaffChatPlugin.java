@@ -13,11 +13,12 @@ public final class StaffChatPlugin extends JavaPlugin {
         settings = new StaffChatSettings(this);
         settings.reload();
         discordRelayService = new DiscordRelayService(this, settings);
+        discordRelayService.registerInboundRelay();
 
         getServer().getPluginManager().registerEvents(new StaffChatListener(settings, discordRelayService), this);
 
         if (getCommand("staffchat") != null) {
-            getCommand("staffchat").setExecutor(new StaffChatCommand(this, settings));
+            getCommand("staffchat").setExecutor(new StaffChatCommand(this, settings, discordRelayService));
         } else {
             getLogger().warning("Command 'staffchat' is not defined in plugin.yml");
         }
@@ -27,6 +28,9 @@ public final class StaffChatPlugin extends JavaPlugin {
 
     @Override
     public void onDisable() {
+        if (discordRelayService != null) {
+            discordRelayService.unregisterInboundRelay();
+        }
         getLogger().info("StaffChat disabled.");
     }
 }

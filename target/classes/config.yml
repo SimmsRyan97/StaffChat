@@ -35,12 +35,20 @@ discord:
   channel-id: ""
   channel-name: "staff-chat"
 
-  # Message format sent to Discord.
-  # Mirrors the normal in-game chat format DiscordSRV uses: "PlayerName: message"
-  # Placeholders: %sender%, %message%
-  message-format: "**[Staff Chat]** %sender% > %message%"
+  outbound:
+    # Relay in-game prefixed staff messages to Discord.
+    enabled: true
 
-  # Used only when provider is ESSENTIALS.
-  # EssentialsXDiscord command to send a message to a channel by ID.
-  # Syntax: essentialsdiscord message <channelId> <message>
-  essentials-relay-command: "essentialsdiscord message %channel_id% [Staff Chat] %sender% > %message%"
+    # Uses the provider's own Minecraft -> Discord formatting:
+    # - DiscordSRV: messages.yml (MinecraftChatToDiscordMessageFormat + channel mapping)
+    # - EssentialsDiscord: built-in player chat format
+    # No duplicate message format is configured here.
+
+  inbound:
+    # Relay messages from the configured Discord staff channel back to in-game
+    # staff chat (players with `staffchat.receive`).
+    enabled: true
+
+    # Reuse the provider's own Discord -> Minecraft format (DiscordSRV messages.yml
+    # or Essentials Discord relay format) and only prepend StaffChat's prefix.
+    add-prefix: true

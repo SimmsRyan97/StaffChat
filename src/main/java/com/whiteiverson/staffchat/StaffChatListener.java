@@ -50,6 +50,6 @@ public final class StaffChatListener implements Listener {
             }
         }
 
-        discordRelayService.relayStaffMessage(sender.getName(), content);
+        discordRelayService.relayStaffMessage(sender, content);
     }
 }

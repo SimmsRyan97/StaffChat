@@ -9,10 +9,13 @@ public final class StaffChatCommand implements CommandExecutor {
 
     private final StaffChatPlugin plugin;
     private final StaffChatSettings settings;
+    private final DiscordRelayService discordRelayService;
 
-    public StaffChatCommand(StaffChatPlugin plugin, StaffChatSettings settings) {
+    public StaffChatCommand(StaffChatPlugin plugin, StaffChatSettings settings,
+            DiscordRelayService discordRelayService) {
         this.plugin = plugin;
         this.settings = settings;
+        this.discordRelayService = discordRelayService;
     }
 
     @Override
@@ -31,6 +34,8 @@ public final class StaffChatCommand implements CommandExecutor {
         if (args[0].equalsIgnoreCase("reload")) {
             plugin.reloadConfig();
             settings.reload();
+            discordRelayService.unregisterInboundRelay();
+            discordRelayService.registerInboundRelay();
             sender.sendMessage(settings.getReloadedMessage());
             return true;
         }

@@ -1,6 +1,7 @@
 package com.whiteiverson.staffchat;
 
 import org.bukkit.ChatColor;
+import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.plugin.java.JavaPlugin;
 
@@ -27,8 +28,10 @@ public final class StaffChatSettings {
     private String discordProvider;
     private String discordChannelId;
     private String discordChannelName;
-    private String discordMessageFormat;
-    private String essentialsRelayCommand;
+    private boolean discordOutboundEnabled;
+    private boolean discordInboundEnabled;
+    private boolean discordInboundAddPrefix;
+    private String pluginPrefix;
 
     public StaffChatSettings(JavaPlugin plugin) {
         this.plugin = plugin;
@@ -40,11 +43,12 @@ public final class StaffChatSettings {
         chatPrefix = config.getString("chat.prefix", "@");
         allowPublicSending = config.getBoolean("chat.allow-public-sending", true);
 
-        String pluginPrefix = colorize(config.getString("style.plugin-prefix", "&6[StaffChat]"));
+        pluginPrefix = colorize(config.getString("style.plugin-prefix", "&6[StaffChat]"));
         String template = config.getString("style.message-format", "%prefix% &7%sender% &8> &f%message%");
         formattedMessage = colorize(template).replace("%prefix%", pluginPrefix);
 
-        noPermissionMessage = colorize(config.getString("messages.no-permission", "&cYou do not have permission to do that."));
+        noPermissionMessage = colorize(
+                config.getString("messages.no-permission", "&cYou do not have permission to do that."));
         reloadedMessage = colorize(config.getString("messages.reloaded", "&aStaffChat configuration reloaded."));
         helpHeader = colorize(config.getString("messages.help-header", "&6StaffChat"));
         helpReloadLine = colorize(config.getString("messages.help-reload", "&7/sc reload &8- &fReload configuration"));
@@ -53,8 +57,22 @@ public final class StaffChatSettings {
         discordProvider = config.getString("discord.provider", "AUTO");
         discordChannelId = config.getString("discord.channel-id", "");
         discordChannelName = config.getString("discord.channel-name", "");
-        discordMessageFormat = config.getString("discord.message-format", "[StaffChat] %sender%: %message%");
-        essentialsRelayCommand = config.getString("discord.essentials-relay-command", "");
+
+        ConfigurationSection outbound = config.getConfigurationSection("discord.outbound");
+        if (outbound != null) {
+            discordOutboundEnabled = outbound.getBoolean("enabled", true);
+        } else {
+            discordOutboundEnabled = config.getBoolean("discord.send-enabled", true);
+        }
+
+        ConfigurationSection inbound = config.getConfigurationSection("discord.inbound");
+        if (inbound != null) {
+            discordInboundEnabled = inbound.getBoolean("enabled", true);
+            discordInboundAddPrefix = inbound.getBoolean("add-prefix", true);
+        } else {
+            discordInboundEnabled = config.getBoolean("discord.receive-enabled", true);
+            discordInboundAddPrefix = config.getBoolean("discord.receive-add-prefix", true);
+        }
     }
 
     public String getChatPrefix() {
@@ -67,8 +85,8 @@ public final class StaffChatSettings {
 
     public String formatStaffMessage(String senderName, String content) {
         return formattedMessage
-            .replace("%sender%", senderName)
-            .replace("%message%", content);
+                .replace("%sender%", senderName)
+                .replace("%message%", content);
     }
 
     public String getNoPermissionMessage() {
@@ -103,17 +121,20 @@ public final class StaffChatSettings {
         return discordChannelName == null ? "" : discordChannelName;
     }
 
-    public String getEssentialsRelayCommand() {
-        return essentialsRelayCommand == null ? "" : essentialsRelayCommand;
+    public boolean isDiscordOutboundEnabled() {
+        return discordOutboundEnabled;
     }
 
-    public String formatDiscordMessage(String senderName, String content) {
-        String template = discordMessageFormat == null ? "[StaffChat] %sender%: %message%" : discordMessageFormat;
-        return template
-            .replace("%sender%", senderName)
-            .replace("%message%", content)
-            .replace("%channel_id%", getDiscordChannelId())
-            .replace("%channel_name%", getDiscordChannelName());
+    public boolean isDiscordInboundEnabled() {
+        return discordInboundEnabled;
+    }
+
+    public boolean isDiscordInboundAddPrefix() {
+        return discordInboundAddPrefix;
+    }
+
+    public String getPluginPrefix() {
+        return pluginPrefix == null ? "" : pluginPrefix;
     }
 
     private static String colorize(String text) {
