@@ -3,8 +3,6 @@ package com.whiteiverson.staffchat;
 import github.scarsz.discordsrv.DiscordSRV;
 import github.scarsz.discordsrv.api.Subscribe;
 import github.scarsz.discordsrv.api.events.DiscordGuildMessagePostProcessEvent;
-import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.event.Event;
@@ -90,7 +88,8 @@ public final class DiscordRelayService {
         if (!isPluginEnabled("EssentialsDiscord") && !isPluginEnabled("EssentialsXDiscord")) {
             if (!warnedEssentialsUnavailable) {
                 warnedEssentialsUnavailable = true;
-                plugin.getLogger().warning("StaffChat: discord.provider is ESSENTIALS but EssentialsDiscord is not loaded.");
+                plugin.getLogger()
+                        .warning("StaffChat: discord.provider is ESSENTIALS but EssentialsDiscord is not loaded.");
             }
             return;
         }
@@ -101,7 +100,8 @@ public final class DiscordRelayService {
             Class<Object> serviceType = (Class<Object>) discordServiceClass;
             Object service = Bukkit.getServicesManager().load(serviceType);
             if (service == null) {
-                plugin.getLogger().warning("StaffChat: Essentials DiscordService is unavailable. Is EssentialsDiscord enabled?");
+                plugin.getLogger()
+                        .warning("StaffChat: Essentials DiscordService is unavailable. Is EssentialsDiscord enabled?");
                 return;
             }
 
@@ -157,22 +157,21 @@ public final class DiscordRelayService {
 
                     event.setCancelled(true);
 
-                    Component message = event.getMinecraftMessage();
-                    if (message == null) {
+                    String message = event.getProcessedMessage();
+                    if (message == null || message.isBlank()) {
                         return;
                     }
 
-                    Component outbound = message;
+                    String outbound = message;
                     if (settings.isDiscordInboundAddPrefix()) {
                         String prefix = settings.getPluginPrefix();
                         if (!prefix.isBlank()) {
-                            Component prefixComponent = LegacyComponentSerializer.legacySection().deserialize(prefix + " ");
-                            outbound = prefixComponent.append(message);
+                            outbound = prefix + " " + message;
                         }
                     }
 
-                    Component finalOutbound = outbound;
-                    Bukkit.getScheduler().runTask(plugin, () -> sendInboundComponentToStaff(finalOutbound));
+                    String finalOutbound = outbound;
+                    Bukkit.getScheduler().runTask(plugin, () -> sendInboundMessageToStaff(finalOutbound));
                 }
             };
 
@@ -182,7 +181,8 @@ public final class DiscordRelayService {
             discordSrvInboundListener = null;
             if (!warnedDiscordSrvListenerFailed) {
                 warnedDiscordSrvListenerFailed = true;
-                plugin.getLogger().warning("StaffChat: Failed to attach DiscordSRV inbound listener: " + exception.getMessage());
+                plugin.getLogger()
+                        .warning("StaffChat: Failed to attach DiscordSRV inbound listener: " + exception.getMessage());
             }
         }
     }
@@ -197,7 +197,8 @@ public final class DiscordRelayService {
             if (!isPluginEnabled("EssentialsDiscord") && !isPluginEnabled("EssentialsXDiscord")) {
                 if (!warnedEssentialsUnavailable) {
                     warnedEssentialsUnavailable = true;
-                    plugin.getLogger().warning("StaffChat: Discord inbound relay requested, but EssentialsDiscord is not loaded.");
+                    plugin.getLogger().warning(
+                            "StaffChat: Discord inbound relay requested, but EssentialsDiscord is not loaded.");
                 }
                 return;
             }
@@ -212,18 +213,18 @@ public final class DiscordRelayService {
             };
 
             Bukkit.getPluginManager().registerEvent(
-                (Class<? extends Event>) relayEventClass,
-                essentialsInboundListener,
-                EventPriority.HIGHEST,
-                (listener, event) -> handleEssentialsInboundRelayEvent(event),
-                plugin,
-                true
-            );
+                    (Class<? extends Event>) relayEventClass,
+                    essentialsInboundListener,
+                    EventPriority.HIGHEST,
+                    (listener, event) -> handleEssentialsInboundRelayEvent(event),
+                    plugin,
+                    true);
 
             plugin.getLogger().info("StaffChat: Essentials inbound relay enabled using provider formatting.");
         } catch (Exception exception) {
             essentialsInboundListener = null;
-            plugin.getLogger().warning("StaffChat: Failed to attach Essentials inbound listener: " + exception.getMessage());
+            plugin.getLogger()
+                    .warning("StaffChat: Failed to attach Essentials inbound listener: " + exception.getMessage());
         }
     }
 
@@ -287,7 +288,8 @@ public final class DiscordRelayService {
                 viewers.removeIf(viewer -> !isEssentialsViewerAllowed(viewer));
             }
         } catch (Exception exception) {
-            plugin.getLogger().warning("StaffChat: Failed to process Essentials inbound relay event: " + exception.getMessage());
+            plugin.getLogger()
+                    .warning("StaffChat: Failed to process Essentials inbound relay event: " + exception.getMessage());
         }
     }
 
@@ -350,8 +352,8 @@ public final class DiscordRelayService {
         return false;
     }
 
-    private void sendInboundComponentToStaff(Component message) {
-        if (message == null) {
+    private void sendInboundMessageToStaff(String message) {
+        if (message == null || message.isBlank()) {
             return;
         }
 
