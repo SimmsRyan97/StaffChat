@@ -32,6 +32,10 @@ discord:
 
   # The Discord channel ID to send messages to.
   # Right-click the channel in Discord (with Developer Mode on) and copy the ID.
+  # StaffChat treats this as the source of truth and binds DiscordSRV runtime routing
+  # automatically, so you do not need to predefine this private channel in DiscordSRV Channels.
+  # Optional for DiscordSRV: explicit runtime game key used internally by StaffChat.
+  channel-key: ""
   channel-id: ""
   channel-name: "staff-chat"
 
@@ -40,9 +44,9 @@ discord:
     enabled: true
 
     # Uses the provider's own Minecraft -> Discord formatting:
-    # - DiscordSRV: messages.yml (MinecraftChatToDiscordMessageFormat + channel mapping)
+    # - DiscordSRV: messages.yml (MinecraftChatToDiscordMessageFormat)
     # - EssentialsDiscord: built-in player chat format
-    # No duplicate message format is configured here.
+    # StaffChat only prepends its prefix to the message body.
 
   inbound:
     # Relay messages from the configured Discord staff channel back to in-game

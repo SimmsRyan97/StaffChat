@@ -1,9 +1,10 @@
-package com.whiteiverson.staffchat;
+﻿package com.whiteiverson.staffchat;
 
 import github.scarsz.discordsrv.DiscordSRV;
 import github.scarsz.discordsrv.api.Subscribe;
 import github.scarsz.discordsrv.api.events.DiscordGuildMessagePostProcessEvent;
 import org.bukkit.Bukkit;
+import org.bukkit.ChatColor;
 import org.bukkit.entity.Player;
 import org.bukkit.event.Event;
 import org.bukkit.event.EventPriority;
@@ -14,6 +15,7 @@ import org.bukkit.plugin.Plugin;
 import java.lang.reflect.Method;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 
 public final class DiscordRelayService {
     private static final String RECEIVE_PERMISSION = "staffchat.receive";
@@ -24,6 +26,9 @@ public final class DiscordRelayService {
     private boolean warnedDiscordSrvUnavailable;
     private boolean warnedEssentialsUnavailable;
     private boolean warnedDiscordSrvListenerFailed;
+    private boolean warnedDiscordSrvChannelConfig;
+    private boolean warnedEssentialsServiceUnavailable;
+    private boolean warnedInboundChannelMismatch;
 
     private Object discordSrvInboundListener;
     private Listener essentialsInboundListener;
@@ -44,6 +49,7 @@ public final class DiscordRelayService {
 
         Bukkit.getScheduler().runTask(plugin, () -> {
             String provider = settings.getDiscordProvider().toUpperCase(Locale.ROOT);
+
             switch (provider) {
                 case "DISCORDSRV":
                     sendViaDiscordSrv(sender, content);
@@ -52,6 +58,7 @@ public final class DiscordRelayService {
                     sendViaEssentials(sender, content);
                     break;
                 default:
+                    // AUTO: DiscordSRV first, Essentials fallback.
                     if (isPluginEnabled("DiscordSRV")) {
                         sendViaDiscordSrv(sender, content);
                     } else {
@@ -71,14 +78,24 @@ public final class DiscordRelayService {
             return;
         }
 
-        String gameChannel = settings.getDiscordChannelName();
-        if (gameChannel.isBlank()) {
-            gameChannel = "global";
+        String channelKey = resolveDiscordSrvGameChannelKey();
+        if (channelKey.isBlank()) {
+            if (!warnedDiscordSrvChannelConfig) {
+                warnedDiscordSrvChannelConfig = true;
+                plugin.getLogger().warning(
+                        "StaffChat: No DiscordSRV channel key resolved. Set discord.channel-key or discord.channel-name.");
+            }
+            return;
+        }
+
+        if (!ensureDiscordSrvChannelBinding(channelKey)) {
+            return;
         }
 
         try {
-            // Uses DiscordSRV's own Minecraft->Discord formatting pipeline.
-            DiscordSRV.getPlugin().processChatMessage(sender, content, gameChannel, false, null);
+            // Uses DiscordSRV's own Minecraft->Discord processing and formatting.
+            DiscordSRV.getPlugin().processChatMessage(sender, buildOutboundDiscordContent(content), channelKey, false,
+                    null);
         } catch (Exception exception) {
             plugin.getLogger().warning("StaffChat: DiscordSRV outbound relay failed: " + exception.getMessage());
         }
@@ -100,14 +117,17 @@ public final class DiscordRelayService {
             Class<Object> serviceType = (Class<Object>) discordServiceClass;
             Object service = Bukkit.getServicesManager().load(serviceType);
             if (service == null) {
-                plugin.getLogger()
-                        .warning("StaffChat: Essentials DiscordService is unavailable. Is EssentialsDiscord enabled?");
+                if (!warnedEssentialsServiceUnavailable) {
+                    warnedEssentialsServiceUnavailable = true;
+                    plugin.getLogger().warning(
+                            "StaffChat: Essentials DiscordService is unavailable. Is EssentialsDiscord enabled?");
+                }
                 return;
             }
 
             // Uses EssentialsDiscord predefined player chat formatting.
             Method sendChatMessage = discordServiceClass.getMethod("sendChatMessage", Player.class, String.class);
-            sendChatMessage.invoke(service, sender, content);
+            sendChatMessage.invoke(service, sender, buildOutboundDiscordContent(content));
         } catch (Exception exception) {
             plugin.getLogger().warning("StaffChat: Essentials outbound relay failed: " + exception.getMessage());
         }
@@ -122,6 +142,7 @@ public final class DiscordRelayService {
 
         String provider = settings.getDiscordProvider().toUpperCase(Locale.ROOT);
 
+        // AUTO: DiscordSRV priority first, then Essentials fallback.
         if (provider.equals("AUTO") || provider.equals("DISCORDSRV")) {
             if (isPluginEnabled("DiscordSRV")) {
                 registerDiscordSrvInbound();
@@ -143,6 +164,20 @@ public final class DiscordRelayService {
             return;
         }
 
+        String channelKey = resolveDiscordSrvGameChannelKey();
+        if (channelKey.isBlank()) {
+            if (!warnedDiscordSrvChannelConfig) {
+                warnedDiscordSrvChannelConfig = true;
+                plugin.getLogger().warning(
+                        "StaffChat: No DiscordSRV channel key resolved for inbound relay. Set discord.channel-key or discord.channel-name.");
+            }
+            return;
+        }
+
+        if (!ensureDiscordSrvChannelBinding(channelKey)) {
+            return;
+        }
+
         try {
             discordSrvInboundListener = new Object() {
                 @Subscribe
@@ -152,6 +187,7 @@ public final class DiscordRelayService {
                     }
 
                     if (!isConfiguredDiscordChannel(event.getChannel().getId(), event.getChannel().getName())) {
+                        warnInboundChannelMismatch(event.getChannel().getId(), event.getChannel().getName());
                         return;
                     }
 
@@ -263,6 +299,7 @@ public final class DiscordRelayService {
             String channelId = invokeStringNoThrow(channel, "getId");
             String channelName = invokeStringNoThrow(channel, "getName");
             if (!isConfiguredDiscordChannel(channelId, channelName)) {
+                warnInboundChannelMismatch(channelId, channelName);
                 return;
             }
 
@@ -350,6 +387,85 @@ public final class DiscordRelayService {
         }
 
         return false;
+    }
+
+    private void warnInboundChannelMismatch(String incomingId, String incomingName) {
+        if (warnedInboundChannelMismatch) {
+            return;
+        }
+
+        warnedInboundChannelMismatch = true;
+        plugin.getLogger().warning(
+                "StaffChat: Ignoring inbound Discord message from non-staff channel "
+                        + "(id='" + safe(incomingId) + "', name='" + safe(incomingName) + "'). "
+                        + "Configured staff channel-id='" + safe(settings.getDiscordChannelId()) + "', "
+                        + "channel-name='" + safe(settings.getDiscordChannelName()) + "'.");
+    }
+
+    private static String safe(String value) {
+        return value == null ? "" : value;
+    }
+
+    private boolean ensureDiscordSrvChannelBinding(String channelKey) {
+        String channelId = settings.getDiscordChannelId();
+
+        if (channelKey.isBlank()) {
+            return false;
+        }
+
+        try {
+            Map<String, String> channels = DiscordSRV.getPlugin().getChannels();
+
+            if (channelId.isBlank()) {
+                // No id in StaffChat config: only works if DiscordSRV already has a valid
+                // linked id for this key.
+                if (channels.containsKey(channelKey) && channels.get(channelKey) != null
+                        && !channels.get(channelKey).isBlank()) {
+                    return true;
+                }
+                if (!warnedDiscordSrvChannelConfig) {
+                    warnedDiscordSrvChannelConfig = true;
+                    plugin.getLogger()
+                            .warning(
+                                    "StaffChat: discord.channel-id is empty. Set discord.channel-id in StaffChat config so the plugin can bind its private relay channel.");
+                }
+                return false;
+            }
+
+            String existing = channels.get(channelKey);
+            if (!channelId.equals(existing)) {
+                channels.put(channelKey, channelId);
+                plugin.getLogger().info("StaffChat: Bound DiscordSRV channel key '" + channelKey + "' to channel ID "
+                        + channelId + ".");
+            }
+            return true;
+        } catch (Exception exception) {
+            plugin.getLogger()
+                    .warning("StaffChat: Failed to bind DiscordSRV channel mapping: " + exception.getMessage());
+            return false;
+        }
+    }
+
+    private String resolveDiscordSrvGameChannelKey() {
+        String explicitKey = settings.getDiscordChannelKey();
+        if (!explicitKey.isBlank()) {
+            return explicitKey;
+        }
+
+        String channelName = settings.getDiscordChannelName();
+        if (!channelName.isBlank()) {
+            return channelName;
+        }
+
+        return "staffchat-private";
+    }
+
+    private String buildOutboundDiscordContent(String content) {
+        String pluginPrefix = ChatColor.stripColor(settings.getPluginPrefix());
+        if (pluginPrefix == null || pluginPrefix.isBlank()) {
+            return content;
+        }
+        return pluginPrefix + " " + content;
     }
 
     private void sendInboundMessageToStaff(String message) {

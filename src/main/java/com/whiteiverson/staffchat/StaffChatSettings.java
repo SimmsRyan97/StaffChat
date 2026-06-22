@@ -26,6 +26,7 @@ public final class StaffChatSettings {
 
     private boolean discordEnabled;
     private String discordProvider;
+    private String discordChannelKey;
     private String discordChannelId;
     private String discordChannelName;
     private boolean discordOutboundEnabled;
@@ -55,6 +56,7 @@ public final class StaffChatSettings {
 
         discordEnabled = config.getBoolean("discord.enabled", false);
         discordProvider = config.getString("discord.provider", "AUTO");
+        discordChannelKey = config.getString("discord.channel-key", "");
         discordChannelId = config.getString("discord.channel-id", "");
         discordChannelName = config.getString("discord.channel-name", "");
 
@@ -115,6 +117,10 @@ public final class StaffChatSettings {
 
     public String getDiscordChannelId() {
         return discordChannelId == null ? "" : discordChannelId;
+    }
+
+    public String getDiscordChannelKey() {
+        return discordChannelKey == null ? "" : discordChannelKey;
     }
 
     public String getDiscordChannelName() {
