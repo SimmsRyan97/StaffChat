@@ -14,6 +14,7 @@ public final class StaffChatPlugin extends JavaPlugin {
         settings.reload();
         discordRelayService = new DiscordRelayService(this, settings);
         discordRelayService.registerInboundRelay();
+        discordRelayService.startAutoRecovery();
 
         getServer().getPluginManager().registerEvents(new StaffChatListener(settings, discordRelayService), this);
 
@@ -29,6 +30,7 @@ public final class StaffChatPlugin extends JavaPlugin {
     @Override
     public void onDisable() {
         if (discordRelayService != null) {
+            discordRelayService.stopAutoRecovery();
             discordRelayService.unregisterInboundRelay();
         }
         getLogger().info("StaffChat disabled.");

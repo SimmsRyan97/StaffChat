@@ -11,6 +11,7 @@ import org.bukkit.event.EventPriority;
 import org.bukkit.event.HandlerList;
 import org.bukkit.event.Listener;
 import org.bukkit.plugin.Plugin;
+import org.bukkit.scheduler.BukkitTask;
 
 import java.lang.reflect.Method;
 import java.util.List;
@@ -19,6 +20,7 @@ import java.util.Map;
 
 public final class DiscordRelayService {
     private static final String RECEIVE_PERMISSION = "staffchat.receive";
+    private static final long AUTO_RECOVERY_INTERVAL_TICKS = 40L;
 
     private final StaffChatPlugin plugin;
     private final StaffChatSettings settings;
@@ -32,10 +34,33 @@ public final class DiscordRelayService {
 
     private Object discordSrvInboundListener;
     private Listener essentialsInboundListener;
+    private BukkitTask autoRecoveryTask;
 
     public DiscordRelayService(StaffChatPlugin plugin, StaffChatSettings settings) {
         this.plugin = plugin;
         this.settings = settings;
+    }
+
+    public void startAutoRecovery() {
+        stopAutoRecovery();
+        autoRecoveryTask = Bukkit.getScheduler().runTaskTimer(plugin, this::runAutoRecoveryTick,
+                AUTO_RECOVERY_INTERVAL_TICKS, AUTO_RECOVERY_INTERVAL_TICKS);
+        refreshNow();
+    }
+
+    public void stopAutoRecovery() {
+        if (autoRecoveryTask != null) {
+            autoRecoveryTask.cancel();
+            autoRecoveryTask = null;
+        }
+    }
+
+    public void refreshNow() {
+        if (!plugin.isEnabled()) {
+            return;
+        }
+
+        Bukkit.getScheduler().runTask(plugin, this::runAutoRecoveryTick);
     }
 
     public void relayStaffMessage(Player sender, String content) {
@@ -279,6 +304,88 @@ public final class DiscordRelayService {
             HandlerList.unregisterAll(essentialsInboundListener);
             essentialsInboundListener = null;
         }
+    }
+
+    private void runAutoRecoveryTick() {
+        if (!plugin.isEnabled()) {
+            return;
+        }
+
+        if (!settings.isDiscordEnabled()) {
+            if (hasInboundRelayRegistered()) {
+                unregisterInboundRelay();
+            }
+            return;
+        }
+
+        // Keep DiscordSRV channel routing bound even if DiscordSRV config was reloaded.
+        if (shouldUseDiscordSrv()) {
+            String channelKey = resolveDiscordSrvGameChannelKey();
+            if (!channelKey.isBlank()) {
+                ensureDiscordSrvChannelBinding(channelKey);
+            }
+        }
+
+        if (!settings.isDiscordInboundEnabled()) {
+            if (hasInboundRelayRegistered()) {
+                unregisterInboundRelay();
+            }
+            return;
+        }
+
+        if (shouldUseDiscordSrvForInbound()) {
+            if (essentialsInboundListener != null || discordSrvInboundListener == null) {
+                registerInboundRelay();
+            }
+            return;
+        }
+
+        if (shouldUseEssentialsForInbound()) {
+            if (discordSrvInboundListener != null || essentialsInboundListener == null) {
+                registerInboundRelay();
+            }
+            return;
+        }
+
+        if (hasInboundRelayRegistered()) {
+            unregisterInboundRelay();
+        }
+    }
+
+    private boolean shouldUseDiscordSrv() {
+        String provider = settings.getDiscordProvider().toUpperCase(Locale.ROOT);
+        if (provider.equals("DISCORDSRV")) {
+            return isPluginEnabled("DiscordSRV");
+        }
+        return provider.equals("AUTO") && isPluginEnabled("DiscordSRV");
+    }
+
+    private boolean shouldUseDiscordSrvForInbound() {
+        if (!settings.isDiscordInboundEnabled()) {
+            return false;
+        }
+
+        String provider = settings.getDiscordProvider().toUpperCase(Locale.ROOT);
+        if (provider.equals("DISCORDSRV")) {
+            return isPluginEnabled("DiscordSRV");
+        }
+        return provider.equals("AUTO") && isPluginEnabled("DiscordSRV");
+    }
+
+    private boolean shouldUseEssentialsForInbound() {
+        if (!settings.isDiscordInboundEnabled()) {
+            return false;
+        }
+
+        String provider = settings.getDiscordProvider().toUpperCase(Locale.ROOT);
+        if (provider.equals("ESSENTIALS")) {
+            return true;
+        }
+        return provider.equals("AUTO") && !isPluginEnabled("DiscordSRV");
+    }
+
+    private boolean hasInboundRelayRegistered() {
+        return discordSrvInboundListener != null || essentialsInboundListener != null;
     }
 
     private void handleEssentialsInboundRelayEvent(Event event) {

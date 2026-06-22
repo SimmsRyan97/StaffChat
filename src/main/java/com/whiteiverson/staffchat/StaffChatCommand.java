@@ -36,6 +36,7 @@ public final class StaffChatCommand implements CommandExecutor {
             settings.reload();
             discordRelayService.unregisterInboundRelay();
             discordRelayService.registerInboundRelay();
+            discordRelayService.refreshNow();
             sender.sendMessage(settings.getReloadedMessage());
             return true;
         }
